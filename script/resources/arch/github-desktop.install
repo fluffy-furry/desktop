@@ -1,0 +1,16 @@
+# Preserve unrelated /usr/bin/github commands, as the Debian package does.
+post_install() {
+  if [ ! -e /usr/bin/github ] && [ ! -L /usr/bin/github ]; then
+    ln -s /usr/lib/github-desktop/resources/app/static/github /usr/bin/github
+  fi
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  if [ "$(readlink /usr/bin/github 2>/dev/null)" = /usr/lib/github-desktop/resources/app/static/github ]; then
+    rm /usr/bin/github
+  fi
+}

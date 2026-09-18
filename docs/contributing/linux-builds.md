@@ -2,19 +2,33 @@
 
 This fork follows official GitHub Desktop stable releases. Its Linux port carries
 forward [Shiftkey's work](../../CREDITS.md). The [inherited README](../../README.md)
-describes Shiftkey's own feeds and community packages; those feeds do not contain
-this fork's builds.
+describes Shiftkey's feeds and a community AUR package; those sources do not
+contain this fork's builds. Download this fork's packages from [our releases](https://github.com/fluffy-furry/desktop/releases).
 
 The Linux workflow builds `x64` and `arm64` applications. Its x64 Docker image
 uses native x64 Node.js for both builds; the ARM64 target uses GNU AArch64
 cross-compilers. It builds the application once per architecture, then packages
-that output as `.deb`, `.rpm`, and `.AppImage`. Building does not use QEMU.
+that output as `.deb`, `.rpm`, `.AppImage`, and Arch `.pkg.tar.zst`. The ARM64
+Arch package targets Arch Linux ARM. Building does not use QEMU.
 
 Package tests run on matching native x64 and ARM64 runners. Ubuntu and Debian
 install and remove `.deb` packages. Fedora and openSUSE install and remove
-`.rpm` packages. The workflow also checks AppImage extraction and runtime,
-application unit and script tests, and a headless GUI and credential-store smoke
-test. These checks do not replace an interactive desktop sign-in test.
+`.rpm` packages. Arch Linux and Arch Linux ARM install and remove `.pkg.tar.zst`
+packages. The workflow also checks AppImage extraction and runtime, application
+unit and script tests, and a headless GUI and credential-store smoke test. These
+checks do not replace an interactive desktop sign-in test.
+
+## Install on Arch
+
+Download the package for your CPU from [release-3.6.5-linux2](https://github.com/fluffy-furry/desktop/releases/tag/release-3.6.5-linux2),
+then install it with `pacman -U`. For example, on x64:
+
+```sh
+sudo pacman -U ./GitHubDesktop-linux-x86_64-3.6.5-linux2.pkg.tar.zst
+```
+
+On Arch Linux ARM, use the `aarch64` package instead. Download newer releases
+manually; this fork does not provide a pacman repository.
 
 ## Build locally
 

@@ -1,5 +1,5 @@
 # Adapted from Shiftkey's script/electron-builder-linux.yml at release-3.4.13-linux1.
-artifactName: 'GitHubDesktop-${os}-${arch}-${version}-linux1.${ext}'
+artifactName: 'GitHubDesktop-${os}-${arch}-${version}-linux2.${ext}'
 linux:
   executableName: github-desktop
   category: Development

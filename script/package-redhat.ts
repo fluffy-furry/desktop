@@ -44,7 +44,7 @@ export async function packageRedhat(): Promise<string> {
     arch: getArchitecture(),
     name: 'github-desktop',
     bin: 'github-desktop',
-    revision: 'linux1',
+    revision: 'linux2',
     // RPM's T0 payload flag uses all available CPUs for XZ compression.
     compressionLevel: '2T0',
     specTemplate,
@@ -89,7 +89,7 @@ export async function packageRedhat(): Promise<string> {
 
   const destination = join(
     distRoot,
-    `GitHubDesktop-linux-${getArchitecture()}-${getVersion()}-linux1.rpm`
+    `GitHubDesktop-linux-${getArchitecture()}-${getVersion()}-linux2.rpm`
   )
   await rename(files[0], destination)
   return destination

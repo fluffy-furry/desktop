@@ -6,7 +6,7 @@ repo=${GITHUB_REPOSITORY:?}
 source_sha=${GITHUB_SHA:?}
 input_dir=${1:-release-input}
 version=$(node -p "require('./app/package.json').version")
-tag="release-$version-linux1"
+tag="release-$version-linux2"
 title="GitHub Desktop $version"
 staging=$(mktemp -d)
 trap 'rm -rf "$staging"' EXIT
@@ -23,15 +23,16 @@ for arch in amd64 arm64; do
     appimage_arch=arm64
   fi
   for file in \
-    "GitHubDesktop-linux-$arch-$version-linux1.deb" \
-    "GitHubDesktop-linux-$rpm_arch-$version-linux1.rpm" \
-    "GitHubDesktop-linux-$appimage_arch-$version-linux1.AppImage"; do
+    "GitHubDesktop-linux-$arch-$version-linux2.deb" \
+    "GitHubDesktop-linux-$rpm_arch-$version-linux2.rpm" \
+    "GitHubDesktop-linux-$appimage_arch-$version-linux2.AppImage" \
+    "GitHubDesktop-linux-$rpm_arch-$version-linux2.pkg.tar.zst"; do
     test -s "$source_dir/$file"
     cp "$source_dir/$file" "$staging/files/$file"
   done
-  test "$(find "$source_dir" -maxdepth 1 -type f | wc -l)" -eq 4
+  test "$(find "$source_dir" -maxdepth 1 -type f | wc -l)" -eq 5
 done
-test "$(find "$staging/files" -maxdepth 1 -type f | wc -l)" -eq 6
+test "$(find "$staging/files" -maxdepth 1 -type f | wc -l)" -eq 8
 (cd "$staging/files" && sha256sum -- * > SHA256SUMS)
 
 # act exercises the same artifact and checksum gate without publishing.
@@ -59,7 +60,7 @@ cat >> "$staging/notes.md" <<EOF
 
 ---
 
-Linux x64 and ARM64 packages from this fork. All binaries and SHA256SUMS were built and uploaded by [Linux CI](https://github.com/$repo/actions/runs/$GITHUB_RUN_ID) from [$source_sha](https://github.com/$repo/commit/$source_sha), after native architecture and distribution tests. Linux support carries forward [Shiftkey's work](https://github.com/shiftkey/desktop). Install updates manually from this fork's releases.
+Linux x64 and ARM64 Debian, RPM, AppImage, and Arch packages from this fork. All binaries and SHA256SUMS were built and uploaded by [Linux CI](https://github.com/$repo/actions/runs/$GITHUB_RUN_ID) from [$source_sha](https://github.com/$repo/commit/$source_sha), after native architecture and distribution tests. Linux support carries forward [Shiftkey's work](https://github.com/shiftkey/desktop). Install updates manually from this fork's releases.
 EOF
 
 # GitHub does not expose unpublished drafts through the tag endpoint.
@@ -80,7 +81,7 @@ if [[ -n "$release_id" ]]; then
       "$staging/tag.json" >/dev/null
     gh api "repos/$repo/releases/$release_id/assets?per_page=100" \
       > "$staging/assets.json"
-    jq -e 'length == 7 and all(.[];
+    jq -e 'length == 9 and all(.[];
       .state == "uploaded" and .uploader.login == "github-actions[bot]" and
       (.digest | test("^sha256:[0-9a-f]{64}$")))' \
       "$staging/assets.json" >/dev/null
@@ -125,17 +126,19 @@ assets_url="repos/$repo/releases/$release_id/assets?per_page=100"
 validate_assets() {
   gh api "$assets_url" > "$staging/assets.json"
   jq -e --arg dir "$staging/files" '
-    length <= 7 and ([.[].name] | unique | length) == length and
+    length <= 9 and ([.[].name] | unique | length) == length and
     all(.[]; . as $asset |
       ($asset.id | type == "number" and . > 0) and
       $asset.uploader.login == "github-actions[bot]" and
       ($asset.name | IN("SHA256SUMS",
-        "GitHubDesktop-linux-amd64-" + env.VERSION + "-linux1.deb",
-        "GitHubDesktop-linux-arm64-" + env.VERSION + "-linux1.deb",
-        "GitHubDesktop-linux-x86_64-" + env.VERSION + "-linux1.rpm",
-        "GitHubDesktop-linux-aarch64-" + env.VERSION + "-linux1.rpm",
-        "GitHubDesktop-linux-x64-" + env.VERSION + "-linux1.AppImage",
-        "GitHubDesktop-linux-arm64-" + env.VERSION + "-linux1.AppImage")) and
+        "GitHubDesktop-linux-amd64-" + env.VERSION + "-linux2.deb",
+        "GitHubDesktop-linux-arm64-" + env.VERSION + "-linux2.deb",
+        "GitHubDesktop-linux-x86_64-" + env.VERSION + "-linux2.rpm",
+        "GitHubDesktop-linux-aarch64-" + env.VERSION + "-linux2.rpm",
+        "GitHubDesktop-linux-x64-" + env.VERSION + "-linux2.AppImage",
+        "GitHubDesktop-linux-arm64-" + env.VERSION + "-linux2.AppImage",
+        "GitHubDesktop-linux-x86_64-" + env.VERSION + "-linux2.pkg.tar.zst",
+        "GitHubDesktop-linux-aarch64-" + env.VERSION + "-linux2.pkg.tar.zst")) and
       ($asset.state == "uploaded" or
        ($asset.state == "starter" and $asset.digest == null)))
   ' "$staging/assets.json" >/dev/null
@@ -177,10 +180,10 @@ for file in "$staging/files"/*; do
       .digest == $digest and .size == $size)' "$staging/assets.json" >/dev/null
 done
 validate_assets
-test "$(jq length "$staging/assets.json")" -eq 7
+test "$(jq length "$staging/assets.json")" -eq 9
 gh api --method PATCH "repos/$repo/releases/$release_id" -F draft=false \
   > "$staging/published.json"
 jq -e --arg tag "$tag" '.draft == false and .tag_name == $tag' \
   "$staging/published.json" >/dev/null
 test "$(gh api "repos/$repo/git/ref/tags/$tag" --jq '.object.sha')" = "$source_sha"
-echo "Published $tag with six CI-built Linux binaries and SHA256SUMS"
+echo "Published $tag with eight CI-built Linux binaries and SHA256SUMS"

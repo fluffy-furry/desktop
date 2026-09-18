@@ -49,7 +49,7 @@ const options: DebianOptions = {
   dest: distRoot,
   arch: getArchitecture(),
   name: 'github-desktop',
-  revision: 'linux1',
+  revision: 'linux2',
   desktopTemplate: 'script/resources/deb/desktop.ejs',
   bin: 'github-desktop',
   description: 'Simple collaboration from your desktop',
@@ -116,7 +116,7 @@ export async function packageDebian(): Promise<string> {
 
   const oldPath = files[0]
 
-  const newFileName = `GitHubDesktop-linux-${getArchitecture()}-${getVersion()}-linux1.deb`
+  const newFileName = `GitHubDesktop-linux-${getArchitecture()}-${getVersion()}-linux2.deb`
   const newPath = join(distRoot, newFileName)
   await rename(oldPath, newPath)
 

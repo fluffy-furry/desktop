@@ -41,14 +41,14 @@ export async function packageElectronBuilder(): Promise<string> {
 
   const installer = join(
     getDistRoot(),
-    `GitHubDesktop-linux-${architecture}-${getVersion()}-linux1.AppImage`
+    `GitHubDesktop-linux-${architecture}-${getVersion()}-linux2.AppImage`
   )
   if (architecture === 'x64') {
     // electron-builder uses x86_64 for AppImages; keep our CI artifact names.
     await rename(
       join(
         getDistRoot(),
-        `GitHubDesktop-linux-x86_64-${getVersion()}-linux1.AppImage`
+        `GitHubDesktop-linux-x86_64-${getVersion()}-linux2.AppImage`
       ),
       installer
     )

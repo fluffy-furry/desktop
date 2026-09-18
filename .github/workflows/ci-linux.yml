@@ -45,11 +45,21 @@ jobs:
             --workdir /github/workspace \
             --env GITHUB_ACTIONS --env GITHUB_SHA \
             "desktop-linux-packaging:$TARGET_ARCH" "$TARGET_ARCH"
+      - name: Build Arch package from the tested Debian payload
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          docker run --rm --platform linux/amd64 \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/github/workspace" \
+            --workdir /github/workspace \
+            --env TARGET_ARCH archlinux:base-devel \
+            bash script/package-arch.sh "$TARGET_ARCH"
       - name: Verify dependency lockfiles
         run: git diff --exit-code -- yarn.lock app/yarn.lock
 
       - name: Checksums
-        run: cd dist && sha256sum *.deb *.rpm *.AppImage > SHA256SUMS
+        run:
+          cd dist && sha256sum *.deb *.rpm *.AppImage *.pkg.tar.zst > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: github-desktop-linux-${{ matrix.deb_arch }}
@@ -57,6 +67,7 @@ jobs:
             dist/*.deb
             dist/*.rpm
             dist/*.AppImage
+            dist/*.pkg.tar.zst
             dist/SHA256SUMS
           if-no-files-found: error
 
@@ -173,6 +184,16 @@ jobs:
           for image in ubuntu:22.04 ubuntu:26.04 debian:12-slim debian:13-slim quay.io/fedora/fedora:44 registry.opensuse.org/opensuse/leap:16.0; do
             bash script/test-linux-docker.sh dist/*.deb "$image" "$DOCKER_PLATFORM" dist/*.rpm
           done
+      - name: Test Arch package in Docker
+        env:
+          DOCKER_PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [ "$DOCKER_PLATFORM" = linux/arm64 ]; then
+            image=lfdevs/archlinuxarm@sha256:0d76758ac13eb7fd1895ffd610955f0db938c58c26a8edb2515ebf0fba35f0a2
+          else
+            image=archlinux:latest
+          fi
+          bash script/test-linux-arch-docker.sh dist/*.pkg.tar.zst "$image" "$DOCKER_PLATFORM"
       - name: Verify dependency lockfiles
         run: git diff --exit-code -- yarn.lock app/yarn.lock
 

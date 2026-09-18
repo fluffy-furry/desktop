@@ -1,0 +1,57 @@
+# Adapted from the github-desktop-bin AUR package maintained by fanninpm
+# for Shiftkey's Linux releases. Original AUR submitter: immackay.
+# https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=github-desktop-bin
+
+pkgname=github-desktop-bin
+pkgver=${DESKTOP_ARCH_VERSION:?Set DESKTOP_ARCH_VERSION}
+pkgrel=2
+pkgdesc='GUI for managing Git and GitHub'
+arch=('x86_64' 'aarch64')
+url='https://github.com/fluffy-furry/desktop'
+license=('MIT')
+depends=(
+  'alsa-lib'
+  'at-spi2-core'
+  'ca-certificates'
+  'curl'
+  'git'
+  'glib2'
+  'gnome-keyring'
+  'gtk3'
+  'libdrm'
+  'libnotify'
+  'libsecret'
+  'libxkbcommon'
+  'libxss'
+  'libxtst'
+  'mesa'
+  'nspr'
+  'nss'
+  'unzip'
+  'xdg-utils'
+)
+provides=('github-desktop')
+conflicts=('github-desktop')
+install=github-desktop.install
+options=('!strip' '!debug')
+source=('github-desktop.deb' 'LICENSE')
+sha256sums=(
+  "${DESKTOP_DEB_SHA256:?Set DESKTOP_DEB_SHA256}"
+  "${DESKTOP_LICENSE_SHA256:?Set DESKTOP_LICENSE_SHA256}"
+)
+noextract=('github-desktop.deb')
+
+package() {
+  set -o pipefail
+  install -d "$pkgdir"
+  ar p "$srcdir/github-desktop.deb" data.tar.zst | bsdtar -xf - -C "$pkgdir"
+
+  # The Debian payload already supplies the desktop entry, icons and launcher.
+  test -x "$pkgdir/usr/lib/github-desktop/github-desktop"
+  test -x "$pkgdir/usr/lib/github-desktop/resources/app/static/github"
+  test "$(readlink "$pkgdir/usr/bin/github-desktop")" = '../lib/github-desktop/github-desktop'
+  test -f "$pkgdir/usr/share/applications/github-desktop.desktop"
+  test -d "$pkgdir/usr/share/icons/hicolor"
+
+  install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

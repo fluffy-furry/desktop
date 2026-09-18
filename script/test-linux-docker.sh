@@ -84,9 +84,7 @@ docker run --rm --init --shm-size=1g --platform "$platform" \
     chmod 700 "$XDG_RUNTIME_DIR"
     xvfb-run -a dbus-run-session -- bash -euo pipefail -c '\''
       printf "temporary-ci-keyring-password" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
-      for title_bar in native custom; do
-        DESKTOP_SMOKE_TITLE_BAR=$title_bar node script/test-linux-smoke.cjs "$executable"
-      done
+      bash script/test-linux-smoke-retry.sh "$executable"
     '\''
     if command -v apt-get >/dev/null; then
       apt-get remove -y github-desktop
