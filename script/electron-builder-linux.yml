@@ -1,0 +1,13 @@
+# Adapted from Shiftkey's script/electron-builder-linux.yml at release-3.4.13-linux1.
+artifactName: 'GitHubDesktop-${os}-${arch}-${version}-linux1.${ext}'
+linux:
+  executableName: github-desktop
+  category: Development
+  icon: app/static/linux/logos
+  mimeTypes:
+    - x-scheme-handler/x-github-client
+    - x-scheme-handler/x-github-desktop-auth
+    - x-scheme-handler/x-github-desktop-dev-auth
+  target:
+    - AppImage
+  maintainer: 'fluffy-furry <fluffy-furry@users.noreply.github.com>'

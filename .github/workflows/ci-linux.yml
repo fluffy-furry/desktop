@@ -1,0 +1,206 @@
+name: Linux
+
+on:
+  push:
+    branches: [linux]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package Linux (${{ matrix.arch }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            deb_arch: amd64
+          - arch: arm64
+            deb_arch: arm64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Build Shiftkey-style packaging image
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          docker build --platform linux/amd64 \
+            --build-arg TARGET_ARCH="$TARGET_ARCH" \
+            --build-arg NODE_VERSION="$(cat .node-version)" \
+            --tag "desktop-linux-packaging:$TARGET_ARCH" .github/actions/package-linux
+      - name: Build Debian package
+        # Both targets build on x64. ARM64 uses GNU cross-compilers, as in
+        # Shiftkey's packaging action; QEMU is not used for building.
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          docker run --rm --platform linux/amd64 \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/github/workspace" \
+            --workdir /github/workspace \
+            --env GITHUB_ACTIONS --env GITHUB_SHA \
+            "desktop-linux-packaging:$TARGET_ARCH" "$TARGET_ARCH"
+      - name: Verify dependency lockfiles
+        run: git diff --exit-code -- yarn.lock app/yarn.lock
+
+      - name: Checksums
+        run: cd dist && sha256sum *.deb *.rpm *.AppImage > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: github-desktop-linux-${{ matrix.deb_arch }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+  test:
+    name: Test Linux (${{ matrix.arch }})
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+            deb_arch: amd64
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            deb_arch: arm64
+            platform: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      TARGET_ARCH: ${{ matrix.arch }}
+      npm_config_arch: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - name: Use all available build cores
+        run: |
+          build_jobs=$(nproc)
+          printf 'JOBS=%s\nnpm_config_jobs=%s\nMAKEFLAGS=-j%s\nUV_THREADPOOL_SIZE=%s\nDPKG_DEB_THREADS_MAX=%s\n' \
+            "$build_jobs" "$build_jobs" "$build_jobs" "$build_jobs" "$build_jobs" >> "$GITHUB_ENV"
+          echo "Using $build_jobs CPU cores for native builds and package compression."
+      - name: Install Linux build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 libsecret-1-dev fakeroot desktop-file-utils xvfb dbus-x11 libgtk-3-0t64 libnss3 libasound2t64 libgbm1 libxss1 gnome-keyring rpm rpm2cpio cpio
+      - name: Restore Ubuntu login-shell PATH in act containers
+        if: ${{ env.ACT }}
+        # The act image removes the stock /etc/profile PATH export. Git hook
+        # tests intentionally start login shells with an empty environment.
+        run: |
+          printf '%s\n' 'export PATH="${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"' | sudo tee /etc/profile.d/desktop-act-path.sh >/dev/null
+      - name: Install dependencies
+        # Include build dependencies even though the packaged app is production.
+        run:
+          node vendor/yarn-1.21.1.js install --frozen-lockfile
+          --production=false
+      - run:
+          RELEASE_CHANNEL=production node vendor/yarn-1.21.1.js
+          validate-electron-version
+      - run: node vendor/yarn-1.21.1.js lint
+      - run: node vendor/yarn-1.21.1.js validate-changelog
+      - run: node vendor/yarn-1.21.1.js test:setup
+      - run: node vendor/yarn-1.21.1.js test:unit --test-concurrency=4
+      - run: node vendor/yarn-1.21.1.js test:script
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-desktop-linux-${{ matrix.deb_arch }}
+          path: dist
+      - name: Verify artifact checksum
+        run: cd dist && sha256sum -c SHA256SUMS
+      - name: Verify Debian package
+        run:
+          bash script/test-linux-package.sh dist/*.deb "${{ matrix.deb_arch }}"
+      - name: Verify RPM package
+        run: |
+          set -euo pipefail
+          rpm -qip dist/*.rpm
+          test "$(rpm -qp --qf '%{ARCH}' dist/*.rpm)" = "${{ matrix.arch == 'arm64' && 'aarch64' || 'x86_64' }}"
+          rpm_payload=$(mktemp -d)
+          trap 'rm -rf "$rpm_payload"' EXIT
+          rpm2cpio dist/*.rpm | cpio --extract --make-directories --quiet --no-absolute-filenames --directory "$rpm_payload"
+          node script/test-linux-elf.cjs "${{ matrix.arch }}" "$rpm_payload"
+      - name: Verify AppImage package
+        run: |
+          chmod +x dist/*.AppImage
+          if [ "${{ matrix.arch }}" = arm64 ]; then
+            readelf -d dist/*.AppImage > /tmp/desktop-appimage-dynamic.txt
+            if grep -q '(NEEDED)' /tmp/desktop-appimage-dynamic.txt; then
+              echo 'ARM64 AppImage runtime must not require host development libraries.' >&2
+              exit 1
+            fi
+          fi
+          dist/*.AppImage --appimage-extract >/dev/null
+          test -x squashfs-root/AppRun
+          test -x squashfs-root/github-desktop
+          test -d squashfs-root/resources/app
+          node script/test-linux-elf.cjs "${{ matrix.arch }}" dist/*.AppImage squashfs-root
+      - name: Install the Debian package
+        run: sudo apt-get install --reinstall -y ./dist/*.deb
+      - name: Exercise the installed Linux application
+        run: |
+          test_data=$(mktemp -d)
+          export XDG_DATA_HOME="$test_data/data"
+          export XDG_RUNTIME_DIR="$test_data/runtime"
+          mkdir -p "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          xvfb-run -a dbus-run-session -- bash -e -c '
+            printf "temporary-ci-keyring-password" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            node script/test-linux-smoke.cjs /usr/lib/github-desktop/github-desktop
+            DESKTOP_SMOKE_TITLE_BAR=custom node script/test-linux-smoke.cjs /usr/lib/github-desktop/github-desktop
+            APPDIR="$PWD/squashfs-root" node script/test-linux-smoke.cjs "$PWD/squashfs-root/AppRun"
+          '
+          rm -rf "$test_data"
+          rm -rf squashfs-root
+      - name: Test other Linux distributions in Docker
+        env:
+          DOCKER_PLATFORM: ${{ matrix.platform }}
+        run: |
+          for image in ubuntu:22.04 ubuntu:26.04 debian:12-slim debian:13-slim quay.io/fedora/fedora:44 registry.opensuse.org/opensuse/leap:16.0; do
+            bash script/test-linux-docker.sh dist/*.deb "$image" "$DOCKER_PLATFORM" dist/*.rpm
+          done
+      - name: Verify dependency lockfiles
+        run: git diff --exit-code -- yarn.lock app/yarn.lock
+
+  publish:
+    name: Publish tested Linux packages
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/linux' && github.repository ==
+      'fluffy-furry/desktop'
+    needs: [package, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    concurrency:
+      group: linux-release-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-desktop-linux-amd64
+          path: release-input/amd64
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-desktop-linux-arm64
+          path: release-input/arm64
+      - name: Verify and publish CI-built Linux packages
+        run: bash script/publish-linux-release.sh release-input

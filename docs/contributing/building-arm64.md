@@ -1,47 +1,9 @@
-# Building Desktop for `arm64`
+# Build Linux ARM64
 
-Desktop can be built and run on `arm64` (`aarch64`) hardware such as a Raspberry
-Pi 3.
+The [Linux build guide](linux-builds.md) shows the packaging commands. Set
+`target_arch=arm64` on an x64 Docker host. The build uses an AArch64 GNU
+cross-compiler, with x64 Node.js inside the container. No QEMU build is needed.
 
-## Requirements
-
-In order to build for `arm64`, you will need the following:
-
-* A computer with a 64-bit ARMv8 processor.
-* A 64-bit OS.  You can use [Ubuntu 16.04](#ubuntu-1604) and then follow the
-instructions on setup there.
-
-## Setup
-
-Once you have the required tools installed, run this script to install the
-dependencies that Desktop needs for `arm64`:
-
-```shellsession
-$ script/install-arm64-deps.sh
-```
-
-**Note:** Do not use `yarn` here as there is no current way to set environment
-variables to rebuild native modules against `arm64`.
-
-Ensure you set the `TARGET_ARCH` environment variable in your shell:
-
-```shellsession
-$ export TARGET_ARCH=arm64
-```
-
-## Building
-
-After that, you should be able to build the development version of Desktop:
-
-```shellsession
-$ yarn build:dev
-$ yarn start
-```
-
-Or if you want to test the production build:
-
-
-```shellsession
-$ yarn build:prod
-$ yarn start:prod
-```
+CI installs the resulting package on a native ARM64 runner, then runs unit,
+script, GUI, credential-store and distribution checks. Keep x64 and ARM64
+builds in separate checkouts so native dependencies do not mix.

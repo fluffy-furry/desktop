@@ -1,5 +1,10 @@
 import { spawn, SpawnOptions } from 'child_process'
-import { pathExists } from '../path-exists'
+import {
+  formatWorkingDirectoryForFlatpak,
+  isFlatpakBuild,
+  pathExists,
+  spawnEditor,
+} from '../helpers/linux'
 import { ExternalEditorError, FoundEditor } from './shared'
 import {
   expandTargetPathArgument,
@@ -33,6 +38,8 @@ async function launchEditor(
 
     const child = spawnAsDarwinApp
       ? spawn('open', ['-a', editorPath, ...args], opts)
+      : __LINUX__
+      ? spawnEditor(editorPath, args, opts)
       : spawn(editorPath, args, opts)
 
     child.on('error', reject)
@@ -59,7 +66,12 @@ async function launchEditor(
  * @param editor The external editor to launch.
  */
 export const launchExternalEditor = (fullPath: string, editor: FoundEditor) =>
-  launchEditor(editor.path, [fullPath], `'${editor.editor}'`, __DARWIN__)
+  launchEditor(
+    editor.path,
+    [isFlatpakBuild() ? formatWorkingDirectoryForFlatpak(fullPath) : fullPath],
+    `'${editor.editor}'`,
+    __DARWIN__
+  )
 
 /**
  * Open a given file or folder in the desired custom external editor.

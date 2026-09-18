@@ -3,6 +3,9 @@
 import * as cp from 'child_process'
 import * as path from 'path'
 import * as electronInstaller from 'electron-winstaller'
+import { packageDebian } from './package-debian'
+import { packageRedhat } from './package-redhat'
+import { packageElectronBuilder } from './package-electron-builder'
 import { getProductName, getCompanyName } from '../app/package-info'
 import {
   getDistPath,
@@ -22,7 +25,7 @@ import { isGitHubActions } from './build-platforms'
 import { existsSync, rmSync, writeFileSync } from 'fs'
 import { getVersion } from '../app/package-info'
 import { computeBundleHashSync } from '../app/src/lib/compute-bundle-hash'
-import { rename } from 'fs/promises'
+import { chmod, rename } from 'fs/promises'
 import { join } from 'path'
 import { assertNonNullable } from '../app/src/lib/fatal-error'
 
@@ -40,6 +43,11 @@ if (process.platform === 'darwin') {
   packageOSX()
 } else if (process.platform === 'win32') {
   packageWindows()
+} else if (process.platform === 'linux') {
+  packageLinux().catch(error => {
+    console.error(error)
+    process.exitCode = 1
+  })
 } else {
   console.error(`I don't know how to package for ${process.platform} :(`)
   process.exit(1)
@@ -67,6 +75,19 @@ function packageOSX() {
   cp.execSync(
     `ditto -ck --keepParent "${distPath}/${productName}.app" "${dest}"`
   )
+}
+
+async function packageLinux() {
+  // Preserve Shiftkey's prepackaged AppImage, Debian and RPM build sequence.
+  await chmod(join(distPath, 'chrome-sandbox'), 0o4755)
+  const installers = [
+    await packageElectronBuilder(),
+    await packageDebian(),
+    await packageRedhat(),
+  ]
+  for (const installer of installers) {
+    console.log(`Installer created at ${installer}`)
+  }
 }
 
 function packageWindows() {

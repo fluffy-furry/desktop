@@ -13,6 +13,7 @@ import {
   getWindowState,
   registerWindowStateChangedEvents,
 } from '../lib/window-state'
+import { readTitleBarConfigFileSync } from '../lib/get-title-bar-config'
 import { MenuEvent } from './menu'
 import { URLActionType } from '../lib/parse-app-url'
 import { ILaunchStats } from '../lib/stats'
@@ -78,7 +79,13 @@ export class AppWindow {
     } else if (__WIN32__) {
       windowOptions.frame = false
     } else if (__LINUX__) {
+      if (readTitleBarConfigFileSync().titleBarStyle === 'custom') {
+        windowOptions.frame = false
+        windowOptions.autoHideMenuBar = true
+      }
       windowOptions.icon = path.join(__dirname, 'static', 'icon-logo.png')
+      delete windowOptions.minHeight
+      delete windowOptions.minWidth
     }
 
     this.window = new BrowserWindow(windowOptions)

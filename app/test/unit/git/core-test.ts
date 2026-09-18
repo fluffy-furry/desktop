@@ -1,3 +1,4 @@
+import { parseGitError } from '../../../src/lib/git/core'
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import { GitError } from 'dugite'
@@ -116,5 +117,27 @@ describe('git/core', () => {
         )
       }
     })
+  })
+})
+
+describe('Linux Git diagnostics', () => {
+  it('recognizes a non-repository at a filesystem boundary', () => {
+    assert.equal(
+      parseGitError(
+        'fatal: not a git repository (or any parent up to mount point /)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).\n'
+      ),
+      GitError.NotAGitRepository
+    )
+  })
+  it('retains the usual non-repository diagnostic', () => {
+    assert.equal(
+      parseGitError(
+        'fatal: not a git repository (or any of the parent directories): .git'
+      ),
+      GitError.NotAGitRepository
+    )
+  })
+  it('does not suppress unknown errors', () => {
+    assert.equal(parseGitError('fatal: unknown problem'), null)
   })
 })

@@ -5,6 +5,7 @@ import { spawnSync, SpawnSyncOptions } from 'child_process'
 
 import glob from 'glob'
 import { forceUnwrap } from '../app/src/lib/fatal-error'
+import { ensureLinuxArm64ProcessProxy } from './linux-arm64-process-proxy'
 
 const root = Path.dirname(__dirname)
 
@@ -41,12 +42,25 @@ function findYarnVersion(callback: (path: string) => void) {
   })
 }
 
-findYarnVersion(path => {
-  let result = spawnSync(
-    'node',
-    [path, '--cwd', 'app', 'install', '--force'],
-    options
-  )
+findYarnVersion(async path => {
+  try {
+    await ensureLinuxArm64ProcessProxy()
+  } catch (error) {
+    console.error(error)
+    process.exit(1)
+  }
+
+  const installArgs = [path, '--cwd', 'app', 'install', '--force']
+  if (
+    process.platform === 'linux' &&
+    process.env.npm_config_arch === 'arm64' &&
+    process.arch !== 'arm64'
+  ) {
+    // Yarn 1 filters optional dependencies by the host CPU even when npm's
+    // target architecture is ARM64. Keep Copilot's target package available.
+    installArgs.push('--ignore-platform')
+  }
+  let result = spawnSync('node', installArgs, options)
 
   if (result.status !== 0) {
     process.exit(result.status || 1)

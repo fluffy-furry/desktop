@@ -1,7 +1,7 @@
 import {
   exec,
   GitError as DugiteError,
-  parseError,
+  parseError as parseDugiteError,
   IGitResult as DugiteResult,
   IGitExecutionOptions as DugiteExecutionOptions,
   parseBadConfigValueErrorInfo,
@@ -17,6 +17,18 @@ import { kStringMaxLength } from 'buffer'
 import { withHooksEnv } from '../hooks/with-hooks-env'
 import { coerceToString } from './coerce-to-string'
 import { pushTerminalChunk } from './push-terminal-chunk'
+
+/** Recognize Git's mount-boundary diagnostic, common on Linux /tmp mounts. */
+export function parseGitError(stderr: string): DugiteError | null {
+  if (
+    /^fatal: not a git repository \(or any parent up to mount point [^\n]+\)\r?$/m.test(
+      stderr
+    )
+  ) {
+    return DugiteError.NotAGitRepository
+  }
+  return parseDugiteError(stderr)
+}
 
 export const isMaxBufferExceededError = (
   error: unknown
@@ -326,9 +338,9 @@ export async function git(
             ? opts.successExitCodes.has(exitCode)
             : false
           if (!acceptableExitCode) {
-            gitError = parseError(coerceToString(result.stderr))
+            gitError = parseGitError(coerceToString(result.stderr))
             if (gitError === null) {
-              gitError = parseError(coerceToString(result.stdout))
+              gitError = parseGitError(coerceToString(result.stdout))
             }
           }
 

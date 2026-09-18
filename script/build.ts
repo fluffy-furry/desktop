@@ -172,10 +172,12 @@ function packageApp() {
 
   const iconPath = getIconDirectory()
   const assetsCarPath = join(iconPath, 'Assets.car')
-  assert(
-    existsSync(assetsCarPath),
-    `Unable to find Assets.car at ${assetsCarPath}`
-  )
+  if (process.platform !== 'linux') {
+    assert(
+      existsSync(assetsCarPath),
+      `Unable to find Assets.car at ${assetsCarPath}`
+    )
+  }
 
   return packager({
     name: getExecutableName(),
@@ -189,7 +191,7 @@ function packageApp() {
       iconPath,
       process.platform === 'darwin' ? 'icon-logo-legacy.icns' : 'icon-logo'
     ),
-    extraResource: [assetsCarPath],
+    extraResource: process.platform === 'linux' ? [] : [assetsCarPath],
     dir: outRoot,
     overwrite: true,
     tmpdir: false,
@@ -411,7 +413,9 @@ function copyDependencies() {
 
   console.log('  Copying process-proxy binary')
   cpSync(
-    getProxyCommandPath(),
+    process.platform === 'linux'
+      ? getProxyCommandPath('linux', getDistArchitecture())
+      : getProxyCommandPath(),
     path.resolve(
       outRoot,
       process.platform === 'win32' ? 'process-proxy.exe' : 'process-proxy'
@@ -553,6 +557,9 @@ function copyCopilotDependency() {
   const prebuildsDirs = [
     path.join(copilotDestination, 'prebuilds'),
     path.join(copilotDestination, 'ripgrep', 'bin'),
+    ...(process.platform === 'linux'
+      ? [path.join(copilotDestination, 'tgrep', 'bin')]
+      : []),
     path.join(copilotDestination, 'clipboard', 'node_modules', '@teddyzhu'),
     path.join(
       copilotDestination,

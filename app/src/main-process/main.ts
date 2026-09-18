@@ -14,7 +14,7 @@ import * as Fs from 'fs'
 import { AppWindow } from './app-window'
 import { buildDefaultMenu, getAllMenuItems } from './menu'
 import { shellNeedsPatching, updateEnvironmentForProcess } from '../lib/shell'
-import { parseAppURL } from '../lib/parse-app-url'
+import { parseAppURL, findProtocolURL } from '../lib/parse-app-url'
 import {
   handleSquirrelEvent,
   installWindowsCLI,
@@ -43,6 +43,10 @@ import {
 } from '../lib/get-architecture'
 import { buildSpellCheckMenu } from './menu/build-spell-check-menu'
 import { getMainGUID, saveGUIDFile } from '../lib/get-main-guid'
+import {
+  readTitleBarConfigFileSync,
+  saveTitleBarConfigFile,
+} from '../lib/get-title-bar-config'
 import {
   getNotificationsPermission,
   requestNotificationsPermission,
@@ -107,6 +111,12 @@ if (__DEV_SECRETS__) {
   possibleProtocols.add('x-github-desktop-dev-auth')
 } else {
   possibleProtocols.add('x-github-desktop-auth')
+}
+// Community Linux builds use the development OAuth application credentials
+// when official release credentials are unavailable. Accept its callback in
+// production builds as well so browser-based sign-in can complete.
+if (__LINUX__) {
+  possibleProtocols.add('x-github-desktop-dev-auth')
 }
 // Also support Desktop Classic's protocols.
 if (__DARWIN__) {
@@ -239,6 +249,18 @@ async function handleCommandLineArguments(argv: string[]) {
   const args = parseCommandLineArgs(argv, {
     boolean: ['protocol-launcher'],
   })
+
+  // Linux desktop entries pass custom protocol URLs directly as positional
+  // arguments. Preserve that integration after the cross-platform CLI parser
+  // refactor so OAuth and "Open in Desktop" links reach the running app.
+  if (__LINUX__) {
+    const matchingUrl = findProtocolURL(argv, possibleProtocols)
+
+    if (matchingUrl) {
+      handleAppURL(matchingUrl)
+      return
+    }
+  }
 
   // Desktop registers it's protocol handler callback on Windows as
   // `[executable path] --protocol-launcher "%1"`. Note that extra command
@@ -519,6 +541,11 @@ app.on('ready', () => {
     mainWindow?.quitAndInstallUpdate()
   )
 
+  ipcMain.on('restart-app', () => {
+    app.relaunch()
+    app.exit()
+  })
+
   ipcMain.on('quit-app', () => app.quit())
 
   ipcMain.on('minimize-window', () => mainWindow?.minimizeWindow())
@@ -711,6 +738,16 @@ app.on('ready', () => {
   ipcMain.handle('get-guid', () => getMainGUID())
 
   ipcMain.handle('save-guid', (_, guid) => saveGUIDFile(guid))
+
+  ipcMain.handle(
+    'get-title-bar-style',
+    async () => readTitleBarConfigFileSync().titleBarStyle
+  )
+
+  ipcMain.handle(
+    'save-title-bar-style',
+    async (_, titleBarStyle) => await saveTitleBarConfigFile({ titleBarStyle })
+  )
 
   ipcMain.handle('show-notification', async (_, title, body, userInfo) =>
     showNotification(title, body, userInfo)

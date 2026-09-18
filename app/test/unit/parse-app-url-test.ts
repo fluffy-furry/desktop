@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   parseAppURL,
+  findProtocolURL,
   IOpenRepositoryFromURLAction,
   IOAuthAction,
 } from '../../src/lib/parse-app-url'
@@ -161,5 +162,56 @@ describe('parseAppURL', () => {
         'Octokit.Reactive/Octokit.Reactive.csproj'
       )
     })
+  })
+})
+
+describe('Linux protocol launch arguments', () => {
+  const protocols = new Set([
+    'x-github-client',
+    'x-github-desktop-auth',
+    'x-github-desktop-dev-auth',
+  ])
+
+  for (const protocol of [
+    'x-github-desktop-auth',
+    'x-github-desktop-dev-auth',
+  ]) {
+    it(`accepts a positional ${protocol} callback after Electron flags`, () => {
+      const url = `${protocol}://oauth?code=example&state=expected-state`
+      const found = findProtocolURL(
+        ['/usr/bin/github-desktop', '--ozone-platform=wayland', url],
+        protocols
+      )
+      assert.equal(found, url)
+      assert.deepEqual(parseAppURL(found!), {
+        name: 'oauth',
+        code: 'example',
+        state: 'expected-state',
+      })
+    })
+  }
+
+  it('ignores paths, unregistered schemes, and URL-like flag values', () => {
+    assert.equal(
+      findProtocolURL(
+        [
+          '/tmp/repository',
+          'https://github.com/desktop/desktop',
+          'x-github-desktop-auth-fake://oauth',
+          '--url=x-github-desktop-auth://oauth',
+        ],
+        protocols
+      ),
+      undefined
+    )
+  })
+
+  it('preserves Open in Desktop links', () => {
+    const url = 'x-github-client://openRepo/https://github.com/desktop/desktop'
+    assert.equal(
+      findProtocolURL(['/usr/bin/github-desktop', url], protocols),
+      url
+    )
+    assert.equal(parseAppURL(url).name, 'open-repository-from-url')
   })
 })

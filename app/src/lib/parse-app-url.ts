@@ -126,3 +126,14 @@ export function parseAppURL(url: string): URLActionType {
 
   return unknown
 }
+
+/** Find a registered protocol URL passed by a Linux desktop entry. */
+export function findProtocolURL(
+  args: ReadonlyArray<string>,
+  protocols: ReadonlySet<string>
+): string | undefined {
+  return args.find(arg => {
+    const separator = arg.indexOf('://')
+    return separator > 0 && protocols.has(arg.slice(0, separator))
+  })
+}

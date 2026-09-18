@@ -13,7 +13,7 @@ import { IUpdateState, UpdateStatus } from '../lib/update-store'
 import { Loading } from '../lib/loading'
 import { RelativeTime } from '../relative-time'
 import { assertNever } from '../../lib/fatal-error'
-import { ReleaseNotesUri } from '../lib/releases'
+import { ReleaseNotesUri, ForkReleasesUri } from '../lib/releases'
 import { encodePathAsUrl } from '../../lib/path'
 import { isOSNoLongerSupportedByElectron } from '../../lib/get-os'
 import { AriaLiveContainer } from '../accessibility/aria-live-container'
@@ -96,6 +96,14 @@ export class About extends React.Component<IAboutProps> {
   }
 
   private renderUpdateButton() {
+    if (__LINUX__) {
+      return (
+        <Row>
+          <LinkButton uri={ForkReleasesUri}>View Linux Releases</LinkButton>
+        </Row>
+      )
+    }
+
     if (!this.canCheckForUpdates) {
       return null
     }
@@ -143,7 +151,7 @@ export class About extends React.Component<IAboutProps> {
 
   private renderUpdateDetails() {
     if (__LINUX__) {
-      return null
+      return <p>Download Linux updates from this fork's release page.</p>
     }
 
     if (!this.canCheckForUpdates) {

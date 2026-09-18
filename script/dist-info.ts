@@ -26,7 +26,10 @@ export function getExecutableName() {
   if (process.platform === 'win32') {
     return `${getWindowsIdentifierName()}${suffix}`
   } else if (process.platform === 'linux') {
-    return 'desktop'
+    // Keep the Linux desktop-file and icon identifiers application-specific.
+    // The generic "desktop" name collides with icon themes on GNOME and can
+    // make the shell display an unrelated icon for the running application.
+    return `github-desktop${suffix}`
   } else {
     return productName
   }

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Resolve both the installed /usr/bin/github symlink and unpacked builds.
+CLI_PATH=$(readlink -f -- "$0")
+APP_DIR=$(dirname "$(dirname "$CLI_PATH")")
+INSTALL_DIR=$(dirname "$(dirname "$APP_DIR")")
+BINARY=github-desktop
+if [ -x "$INSTALL_DIR/github-desktop-dev" ]; then
+    BINARY=github-desktop-dev
+fi
+ELECTRON_RUN_AS_NODE=1 exec "$INSTALL_DIR/$BINARY" "$APP_DIR/cli.js" "$@"
