@@ -14,4 +14,4 @@ The Arch package follows the [github-desktop-bin AUR package](https://aur.archli
 
 [Rodrigo Geller da Silva (digaovaa)](https://github.com/digaovaa) contributed the newer [Linux 3.5.12 port](https://github.com/shiftkey/desktop/pull/1312), which helped bridge Linux changes to the current official baseline. This integration preserves contributor links and source references; it does not claim authorship of their original work.
 
-This fork adapts those contributions to official 3.6.5 and tests Linux packaging on current distributions. See [Linux build and test instructions](docs/contributing/linux-builds.md).
+This fork adapts those contributions to official 3.6.6 and tests Linux packaging on current distributions. See [Linux build and test instructions](docs/contributing/linux-builds.md).
